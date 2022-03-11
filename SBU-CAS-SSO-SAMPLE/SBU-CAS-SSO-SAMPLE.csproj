@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="GSS.Authentication.CAS.AspNetCore" Version="5.0.1" />
+    <PackageReference Include="GSS.Authentication.CAS.DistributedCache" Version="5.0.1" />
   </ItemGroup>
 
 </Project>

@@ -1,4 +1,5 @@
-﻿using GSS.Authentication.CAS.AspNetCore;
+﻿using GSS.Authentication.CAS;
+using GSS.Authentication.CAS.AspNetCore;
 using GSS.Authentication.CAS.Validation;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -9,11 +10,24 @@ using System.Security.Claims;
 
 namespace SBU_CAS_SSO_SAMPLE
 {
-    public class Auth
+    public static class Auth
     {
-        public static void ConfigureService(WebApplicationBuilder builder, bool setGlobal = false)
+        private static bool GlobalAuth = false;
+        private static bool ShowAllAuthOptions = false;
+        private static string DefaultAuthScheme = "CAS";
+        private static IServiceProvider? services = null;
+        private static bool DidStonyBrookRemoveCASInTheLogoutURL = true;
+
+        public static void ConfigureService(WebApplicationBuilder builder, bool globalAuth = false, bool didStonyBrookRemoveCASInTheLogoutURL = true)
         {
-            if (setGlobal)
+            GlobalAuth = globalAuth;
+            DidStonyBrookRemoveCASInTheLogoutURL = didStonyBrookRemoveCASInTheLogoutURL;
+            builder.Services.AddSingleton<IServiceTicketStore, DistributedCacheServiceTicketStore>();
+            builder.Services.AddSingleton<ITicketStore, TicketStoreWrapper>();
+            //builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            //builder.Services.AddSession();
+
+            if (GlobalAuth)
             {
                 builder.Services.AddAuthorization(options =>
                 {
@@ -29,10 +43,19 @@ namespace SBU_CAS_SSO_SAMPLE
                 {
                     options.LoginPath = new PathString("/auth/login");
                     options.LogoutPath = new PathString("/auth/logout");
+                    options.SessionStore = services?.GetRequiredService<ITicketStore>();
                     options.Events = new CookieAuthenticationEvents
                     {
                         OnSigningOut = context =>
                         {
+                            string logouturl = builder.Configuration["Authentication:CAS:ServerUrlBase"];
+                            if (DidStonyBrookRemoveCASInTheLogoutURL)
+                            {
+                                int i = logouturl.LastIndexOf("/cas");
+                                if (i >= 0)
+                                    logouturl = logouturl.Substring(0, i);
+                            }
+
                             // Single Sign-Out
                             var casUrl = new Uri(builder.Configuration["Authentication:CAS:ServerUrlBase"]);
                             var links = context.HttpContext.RequestServices.GetRequiredService<LinkGenerator>();
@@ -100,50 +123,64 @@ namespace SBU_CAS_SSO_SAMPLE
                                 logger.LogError(failure, "{Exception}", failure.Message);
                             }
 
-                            context.Response.Redirect("/Account/ExternalLoginFailure");
+                            context.Response.Redirect("/auth/denied");
                             context.HandleResponse();
                             return Task.CompletedTask;
                         }
                     };
                 });
-            //builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            //builder.Services.AddSession();
         }
 
 
-        public static void ConfigureApp(WebApplication app)
+        public static void ConfigureApp(WebApplication app, bool showAllAuthOptions = false, string defaultAuthScheme = "CAS")
         {
+            ShowAllAuthOptions = showAllAuthOptions;
+            DefaultAuthScheme = defaultAuthScheme;
+            services = app.Services;
+
             //app.UseSession();
+            app.UseCasSingleLogout();
             app.UseAuthentication();
 
             app.Map("/auth/login", branch =>
             {
                 branch.Run(async context =>
                 {
+                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
                     var scheme = context.Request.Query["authscheme"];
                     var returnurl = context.Request.Query["ReturnUrl"];
                     if (string.IsNullOrEmpty(returnurl))
                         returnurl = "/";
 
-                    if (!string.IsNullOrEmpty(scheme))
+
+                    if (ShowAllAuthOptions)
                     {
-                        // By default the client will be redirect back to the URL that issued the challenge (/login?authscheme=foo),
-                        // send them to the home page instead (/).
-                        await context.ChallengeAsync(scheme, new AuthenticationProperties { RedirectUri = returnurl });
-                        return;
+                        if (!string.IsNullOrEmpty(scheme))
+                        {
+                            await context.ChallengeAsync(scheme, new AuthenticationProperties { RedirectUri = returnurl });
+                            return;
+                        }
+
+                        context.Response.ContentType = "text/html";
+                        await context.Response.WriteAsync(@"<!DOCTYPE html><html><head><meta charset=""utf-8""></head><body>");
+                        await context.Response.WriteAsync("<p>Choose an authentication scheme:</p>");
+                        foreach (var type in context.RequestServices.GetRequiredService<IOptions<AuthenticationOptions>>().Value.Schemes)
+                        {
+                            if (string.IsNullOrEmpty(type.DisplayName)) continue;
+                            await context.Response.WriteAsync($"<a href=\"?authscheme={type.Name}&ReturnUrl={returnurl}\">{type.DisplayName ?? type.Name}</a><br>");
+                        }
+                        await context.Response.WriteAsync("</body></html>");
                     }
-
-
-
-                    context.Response.ContentType = "text/html";
-                    await context.Response.WriteAsync(@"<!DOCTYPE html><html><head><meta charset=""utf-8""></head><body>");
-                    await context.Response.WriteAsync("<p>Choose an authentication scheme:</p>");
-                    foreach (var type in context.RequestServices.GetRequiredService<IOptions<AuthenticationOptions>>().Value.Schemes)
+                    else
                     {
-                        if (string.IsNullOrEmpty(type.DisplayName)) continue;
-                        await context.Response.WriteAsync($"<a href=\"?authscheme={type.Name}&ReturnUrl={returnurl}\">{type.DisplayName ?? type.Name}</a><br>");
+                        if (string.IsNullOrEmpty(scheme))
+                        {
+                            scheme = defaultAuthScheme;
+                        }
+
+                        await context.ChallengeAsync(DefaultAuthScheme, new AuthenticationProperties { RedirectUri = returnurl });
                     }
-                    await context.Response.WriteAsync("</body></html>");
                 });
             });
 
@@ -154,6 +191,17 @@ namespace SBU_CAS_SSO_SAMPLE
                 {
                     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                     context.Response.Redirect("/");
+                });
+            });
+
+            app.Map("/auth/denied", branch =>
+            {
+                branch.Run(async context =>
+                {
+                    context.Response.ContentType = "text/html";
+                    await context.Response.WriteAsync(@"<!DOCTYPE html><html><head><meta charset=""utf-8""></head><body>");
+                    await context.Response.WriteAsync("<p>Authentication Failed</p>");
+                    await context.Response.WriteAsync("</body></html>");
                 });
             });
         }
