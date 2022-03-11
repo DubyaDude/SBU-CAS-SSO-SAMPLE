@@ -7,4 +7,8 @@
     <RootNamespace>SBU_CAS_SSO_SAMPLE</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="GSS.Authentication.CAS.AspNetCore" Version="5.0.1" />
+  </ItemGroup>
+
 </Project>

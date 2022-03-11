@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SBU_CAS_SSO_SAMPLE.Models;
 using System.Diagnostics;
 
@@ -18,6 +19,7 @@ namespace SBU_CAS_SSO_SAMPLE.Controllers
             return View();
         }
 
+        [Authorize]
         public IActionResult Privacy()
         {
             return View();

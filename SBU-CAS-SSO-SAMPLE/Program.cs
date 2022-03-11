@@ -3,7 +3,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+SBU_CAS_SSO_SAMPLE.Auth.ConfigureService(builder);
 var app = builder.Build();
+SBU_CAS_SSO_SAMPLE.Auth.ConfigureApp(app);
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
