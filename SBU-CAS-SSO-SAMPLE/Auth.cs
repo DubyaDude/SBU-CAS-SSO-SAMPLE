@@ -73,6 +73,9 @@ namespace SBU_CAS_SSO_SAMPLE
                                 context.Properties,
                                 redirectUri
                             );
+
+                            
+                            //I can not get this to actually trigger the logout URL for some reason
                             context.Response.StatusCode = 204; //Prevent RedirectToReturnUrl
                             context.Options.Events.RedirectToLogout(logoutRedirectContext);
                             return Task.CompletedTask;
@@ -82,6 +85,8 @@ namespace SBU_CAS_SSO_SAMPLE
                 .AddCAS(options =>
                 {
                     options.CasServerUrlBase = builder.Configuration["Authentication:CAS:ServerUrlBase"];
+                    options.SaveTokens = true;
+
                     var protocolVersion = builder.Configuration.GetValue("Authentication:CAS:ProtocolVersion", 3);
                     if (protocolVersion != 3)
                     {
