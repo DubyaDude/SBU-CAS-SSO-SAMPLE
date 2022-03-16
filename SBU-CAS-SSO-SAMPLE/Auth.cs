@@ -57,13 +57,13 @@ namespace SBU_CAS_SSO_SAMPLE
                             }
 
                             // Single Sign-Out
-                            var casUrl = new Uri(builder.Configuration["Authentication:CAS:ServerUrlBase"]);
+                            var casUrl = new Uri(logouturl);
                             var links = context.HttpContext.RequestServices.GetRequiredService<LinkGenerator>();
                             var serviceUrl = new Uri(context.Request.GetEncodedUrl()).GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped);
                             var redirectUri = UriHelper.BuildAbsolute(
                                 casUrl.Scheme,
                                 new HostString(casUrl.Host, casUrl.Port),
-                                casUrl.LocalPath, "/logout",
+                                casUrl.LocalPath, "/Logout",
                                 QueryString.Create("service", serviceUrl!));
 
                             var logoutRedirectContext = new RedirectContext<CookieAuthenticationOptions>(
