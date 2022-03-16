@@ -75,7 +75,6 @@ namespace SBU_CAS_SSO_SAMPLE
                             );
 
                             
-                            //I can not get this to actually trigger the logout URL for some reason
                             context.Response.StatusCode = 204; //Prevent RedirectToReturnUrl
                             context.Options.Events.RedirectToLogout(logoutRedirectContext);
                             return Task.CompletedTask;
@@ -151,8 +150,6 @@ namespace SBU_CAS_SSO_SAMPLE
             {
                 branch.Run(async context =>
                 {
-                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-
                     var scheme = context.Request.Query["authscheme"];
                     var returnurl = context.Request.Query["ReturnUrl"];
                     if (string.IsNullOrEmpty(returnurl))
@@ -194,8 +191,7 @@ namespace SBU_CAS_SSO_SAMPLE
             {
                 branch.Run(async context =>
                 {
-                    await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                    context.Response.Redirect("/");
+                    await context.SignOutAsync();
                 });
             });
 
