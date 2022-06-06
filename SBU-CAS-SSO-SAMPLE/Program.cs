@@ -3,7 +3,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
-SBU_CAS_SSO_SAMPLE.Auth.ConfigureService(builder);
+SBU_CAS_SSO_SAMPLE.Auth.ConfigureService(builder, "sample");
 var app = builder.Build();
 SBU_CAS_SSO_SAMPLE.Auth.ConfigureApp(app);
 

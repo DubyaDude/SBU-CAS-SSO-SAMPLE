@@ -17,8 +17,9 @@ namespace SBU_CAS_SSO_SAMPLE
         private static string DefaultAuthScheme = "CAS";
         private static IServiceProvider? services = null;
         private static bool DidStonyBrookRemoveCASInTheLogoutURL = true;
+        private static string CookieName = "sample-login";
 
-        public static void ConfigureService(WebApplicationBuilder builder, bool globalAuth = false, bool didStonyBrookRemoveCASInTheLogoutURL = true)
+        public static void ConfigureService(WebApplicationBuilder builder, string appName, bool globalAuth = false, bool didStonyBrookRemoveCASInTheLogoutURL = true)
         {
             GlobalAuth = globalAuth;
             DidStonyBrookRemoveCASInTheLogoutURL = didStonyBrookRemoveCASInTheLogoutURL;
@@ -26,6 +27,11 @@ namespace SBU_CAS_SSO_SAMPLE
             builder.Services.AddSingleton<ITicketStore, TicketStoreWrapper>();
             //builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             //builder.Services.AddSession();
+
+            CookieName = appName + "-login";
+#if DEBUG
+            CookieName += "-debug";
+#endif
 
             if (GlobalAuth)
             {
@@ -41,8 +47,16 @@ namespace SBU_CAS_SSO_SAMPLE
             builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(options =>
                 {
+                    options.Cookie.Name = CookieName;
+                    
+#if !DEBUG
+                    options.Cookie.SameSite = SameSiteMode.Strict;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+#endif
+
                     options.LoginPath = new PathString("/auth/login");
                     options.LogoutPath = new PathString("/auth/logout");
+                    options.AccessDeniedPath = new PathString("/auth/denied");
                     options.SessionStore = services?.GetRequiredService<ITicketStore>();
                     options.Events = new CookieAuthenticationEvents
                     {
@@ -83,8 +97,13 @@ namespace SBU_CAS_SSO_SAMPLE
                 })
                 .AddCAS(options =>
                 {
+#if !DEBUG
+                    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+#endif
                     options.CasServerUrlBase = builder.Configuration["Authentication:CAS:ServerUrlBase"];
                     options.SaveTokens = true;
+                    options.AccessDeniedPath = new PathString("/auth/denied");
+                    options.CallbackPath = new PathString("/auth/signin-cas");
 
                     var protocolVersion = builder.Configuration.GetValue("Authentication:CAS:ProtocolVersion", 3);
                     if (protocolVersion != 3)
